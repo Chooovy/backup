@@ -138,56 +138,127 @@ void buildHuffmanCodes(Node* root, std::string code, std::unordered_map<char, st
     }
 }
 
-void compressFile(const std::string& inputFile, const std::string& compressedFile) {
-    std::ifstream inFile(inputFile, std::ios::in);
-    if (!inFile) {
-        std::cerr << "can not open file:" << inputFile << std::endl;
+// void compressFile(const std::string& inputFile, const std::string& compressedFile) {
+//     std::ifstream inFile(inputFile, std::ios::in);
+//     if (!inFile) {
+//         std::cerr << "can not open file:" << inputFile << std::endl;
+//         return;
+//     }
+
+//     std::unordered_map<char, int> frequencyMap;
+//     char ch;
+//     while (inFile.get(ch)) {
+//         frequencyMap[ch]++;
+//     }
+
+//     Node* root = buildHuffmanTree_a(frequencyMap);
+//     std::unordered_map<char, std::string> huffmanCodes;
+//     buildHuffmanCodes(root, "", huffmanCodes);
+
+//     std::ofstream outFile(compressedFile, std::ios::out | std::ios::binary);
+//     for (const auto& entry : huffmanCodes) {
+//         outFile << entry.first << " " << entry.second << " ";
+//     }
+//     outFile << "\n";//这段是压缩文件的编码表
+
+//     inFile.clear();
+//     inFile.seekg(0, std::ios::beg);
+//     std::string encodedData;
+//     while (inFile.get(ch)) {
+//         encodedData += huffmanCodes[ch];
+//     }//将infile中的每一个字符转成huffmancode，然后读入到一行中
+
+//     //以下才是压缩编码
+//     std::bitset<8> bits;
+//     for (char bit : encodedData) {
+//         bits <<= 1;
+//         if (bit == '1') {
+//             bits.set(0);
+//         }
+//         if (bits.size() == 8) {
+//             char byte = static_cast<char>(bits.to_ulong());
+//             outFile.put(byte);
+//             bits.reset();
+//         }
+//     }
+
+//     if (bits.size() > 0) {
+//         char byte = static_cast<char>(bits.to_ulong());
+//         outFile.put(byte);
+//     }
+
+//     inFile.close();
+//     outFile.close();
+// }
+
+// 生成字符到 Huffman 编码的映射
+void generateHuffmanCodes(Node* root, std::string code, std::unordered_map<char, std::string>& huffmanCodes) {
+    if (!root) {
         return;
     }
 
-    std::unordered_map<char, int> frequencyMap;
-    char ch;
-    while (inFile.get(ch)) {
-        frequencyMap[ch]++;
+    if (root->data != '\0') {
+        huffmanCodes[root->data] = code;
     }
 
-    Node* root = buildHuffmanTree_a(frequencyMap);
+    generateHuffmanCodes(root->left, code + "0", huffmanCodes);
+    generateHuffmanCodes(root->right, code + "1", huffmanCodes);
+}
+
+// 压缩文件的函数
+void compressFile(const std::string& inputFile, const std::string& outputFile) {
+    // 读取原始文本
+    std::ifstream inFile(inputFile);
+    if (!inFile) {
+        std::cerr << "无法打开输入文件：" << inputFile << std::endl;
+        return;
+    }
+
+    std::string text;
+    std::getline(inFile, text);
+    inFile.close();
+
+    // 构建字符频率表
+    std::unordered_map<char, int> charFrequency;
+    for (char ch : text) {
+        charFrequency[ch]++;
+    }
+
+    // 构建 Huffman 树
+    Node* root = buildHuffmanTree_a(charFrequency);
+
+    // 生成字符到 Huffman 编码的映射
     std::unordered_map<char, std::string> huffmanCodes;
-    buildHuffmanCodes(root, "", huffmanCodes);
+    generateHuffmanCodes(root, "", huffmanCodes);
 
-    std::ofstream outFile(compressedFile, std::ios::out | std::ios::binary);
+    // 打开输出文件并写入编码表
+    std::ofstream outFile(outputFile, std::ios::binary);
+    if (!outFile) {
+        std::cerr << "无法创建输出文件：" << outputFile << std::endl;
+        return;
+    }
+
     for (const auto& entry : huffmanCodes) {
-        outFile << entry.first << " " << entry.second << "\n";
+        outFile << entry.first << ' ' << entry.second << ' ';
     }
-    outFile << "\n";//这段是压缩文件的编码表
+    outFile << '\n';
 
-    inFile.clear();
-    inFile.seekg(0, std::ios::beg);
-    std::string encodedData;
-    while (inFile.get(ch)) {
-        encodedData += huffmanCodes[ch];
-    }//将infile中的每一个字符转成huffmancode，然后读入到一行中
-
-    //以下才是压缩编码
-    std::bitset<8> bits;
-    for (char bit : encodedData) {
-        bits <<= 1;
-        if (bit == '1') {
-            bits.set(0);
-        }
-        if (bits.size() == 8) {
-            char byte = static_cast<char>(bits.to_ulong());
-            outFile.put(byte);
-            bits.reset();
-        }
+    // 编码并写入压缩数据
+    std::string compressedText;
+    for (char ch : text) {
+        compressedText += huffmanCodes[ch];
     }
 
-    if (bits.size() > 0) {
-        char byte = static_cast<char>(bits.to_ulong());
+    for (size_t i = 0; i < compressedText.size(); i += 8) {
+        char byte = 0;
+        for (int j = 0; j < 8; j++) {
+            if (i + j < compressedText.size() && compressedText[i + j] == '1') {
+                byte |= (1 << (7 - j));
+            }
+        }
         outFile.put(byte);
     }
 
-    inFile.close();
     outFile.close();
 }
 
@@ -313,7 +384,3 @@ int main()
 //判断是否覆盖
 //多文件，include，.h文件
 //namespace
-
-//测试提交
-
-//测试提交2
